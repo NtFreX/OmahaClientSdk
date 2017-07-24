@@ -1,0 +1,105 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="14.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{895A2424-9A6C-494C-8CC1-D55FB708829F}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>Omaha.Feedback</RootNamespace>
+    <AssemblyName>Omaha.Feedback</AssemblyName>
+    <TargetFrameworkVersion>v4.5.2</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+    <SccProjectName>SAK</SccProjectName>
+    <SccLocalPath>SAK</SccLocalPath>
+    <SccAuxPath>SAK</SccAuxPath>
+    <SccProvider>SAK</SccProvider>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="NLog, Version=4.0.0.0, Culture=neutral, PublicKeyToken=5120e14c03d0593c, processorArchitecture=MSIL">
+      <HintPath>..\packages\NLog.4.3.5\lib\net45\NLog.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="protobuf-net">
+      <HintPath>..\..\References\protobuf-net.dll</HintPath>
+    </Reference>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.IO.Compression.FileSystem" />
+    <Reference Include="System.Net.Http" />
+    <Reference Include="System.Xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="InternetMedia.cs" />
+    <Compile Include="OmahaConstants.cs" />
+    <Compile Include="OmahaFeedback.cs" />
+    <Compile Include="OmahaScreenshot.cs" />
+    <Compile Include="Proto\Annotation.cs" />
+    <Compile Include="Proto\Chrome\ChromeBrowserCategory.cs" />
+    <Compile Include="Proto\Chrome\ChromeBrowserData.cs" />
+    <Compile Include="Proto\Chrome\ChromeData.cs" />
+    <Compile Include="Proto\Chrome\ChromeOsCategory.cs" />
+    <Compile Include="Proto\Chrome\ChromeOsData.cs" />
+    <Compile Include="Proto\Chrome\ChromePlatform.cs" />
+    <Compile Include="Proto\CommonData.cs" />
+    <Compile Include="Proto\Dom\HtmlDocument.cs" />
+    <Compile Include="Proto\Dom\HtmlElement.cs" />
+    <Compile Include="Proto\Extension\SuggestQuery.cs" />
+    <Compile Include="Proto\Web\ExtensionDetails.cs" />
+    <Compile Include="Proto\Extension\ExtensionSubmit.cs" />
+    <Compile Include="Proto\Extension\PostedBlackbox.cs" />
+    <Compile Include="Proto\Config\FeedbackTypeData.cs" />
+    <Compile Include="Proto\Dom\HtmlPath.cs" />
+    <Compile Include="Proto\Config\Kind.cs" />
+    <Compile Include="Proto\Config\MatcherData.cs" />
+    <Compile Include="Proto\Math\Dimensions.cs" />
+    <Compile Include="Proto\Dom\Navigator.cs" />
+    <Compile Include="Proto\Config\NotificationGranularity.cs" />
+    <Compile Include="Proto\Config\NotifyChannel.cs" />
+    <Compile Include="Proto\Extension\PostedScreenshot.cs" />
+    <Compile Include="Proto\Config\Product.cs" />
+    <Compile Include="Proto\Web\ProductSpecificBinaryData.cs" />
+    <Compile Include="Proto\Web\ProductSpecificData.cs" />
+    <Compile Include="Proto\Math\Rectangle.cs" />
+    <Compile Include="Proto\Config\Visibility.cs" />
+    <Compile Include="Proto\Web\WebData.cs" />
+    <Compile Include="OmahaFeedbackClient.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Omaha\Omaha.csproj">
+      <Project>{ce732caa-a7f8-4457-9223-0a6110ab2dfb}</Project>
+      <Name>Omaha</Name>
+    </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="packages.config" />
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
+       Other similar extension points exist, see Microsoft.Common.targets.
+  <Target Name="BeforeBuild">
+  </Target>
+  <Target Name="AfterBuild">
+  </Target>
+  -->
+</Project>
