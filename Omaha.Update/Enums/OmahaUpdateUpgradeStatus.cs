@@ -1,4 +1,4 @@
-﻿namespace Omaha.Update.Enum
+﻿namespace Omaha.Update.Enums
 {
     public enum OmahaUpdateUpgradeStatus : long
     {

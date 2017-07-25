@@ -1,18 +1,18 @@
 ﻿using System;
+using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Threading;
 
 using GoogleUpdate3Lib;
 
 using NLog;
-
-using Omaha.Update.Enum;
-using Omaha.Update.Exception;
+using Omaha.Update.Enums;
+using Omaha.Update.Exceptions;
+using Omaha.Update.Helper;
 using Omaha.Update.Properties;
 
 namespace Omaha.Update
 {
-    //TODO: fix user level com class exception
     public class OmahaUpdateDriver
     {
         private Logger Logger { get; set; }
@@ -52,14 +52,16 @@ namespace Omaha.Update
             OnProgress = onProgress;
         }
 
-        private void HandleUpdateError(OmahaUpdateErrorCode errorCode, System.Exception exception, int installerExitCode, string errorString)
+        private void HandleUpdateError(OmahaUpdateErrorCode errorCode, Exception exception, int installerExitCode, string errorString)
         {
             Status = OmahaUpdateUpgradeStatus.UpgradeError;
             ErrorCode = errorCode;
             Exception = exception;
             InstallerExitCode = installerExitCode;
-            ExceptionProvider.ThrowAccordingException(Exception, errorString);
+            ExceptionHelper.ThrowAccordingException(Exception, errorString);
         }
+
+
         private OmahaUpdateErrorCode CanUpdateCurrentApp(string executable)
         {
             //TODO: implement
@@ -73,23 +75,28 @@ namespace Omaha.Update
             //    return OmahaUpdateErrorCode.CANNOT_UPGRADE_IN_THIS_DIRECTORY;
             //return OmahaUpdateErrorCode.OMAHA_UPDATE_NO_ERROR;
         }
-        private void CreateGoogleUpdate(bool systemLevelInstalation)
+
+        private void InitialiseGoogleUpdate(bool systemLevelInstalation)
         {
             try
             {
-                Guid googleUpdateClsid = systemLevelInstalation
+                var googleUpdateClsid = systemLevelInstalation
                     ? OmahaConstants.ClsidOmahaUpdate3WebMachineClass
                     : OmahaConstants.ClsidOmahaUpdate3WebUserClass;
                 //Get COM Type from registry with clsid and cast it into an IGoogleUpdate3Web Interface
                 Logger.Info("creating IGoogleUpdate3Web with clsid {" + googleUpdateClsid + "}");
-                Type comType = Type.GetTypeFromCLSID(googleUpdateClsid, true);
+                var comType = Type.GetTypeFromCLSID(googleUpdateClsid, true);
                 GoogleUpdate = (IGoogleUpdate3Web)Activator.CreateInstance(comType);
+
+                if (GoogleUpdate == null)
+                    throw new Exception("an error occured while initialising the google update com object");
             }
-            catch (System.Exception exce)
+            catch (Exception exce)
             {
-                ExceptionProvider.ThrowAccordingException(exce, "could not create IGoogleUpdate3Web");
+                ExceptionHelper.ThrowAccordingException(exce, "could not initialise IGoogleUpdate3Web");
             }
         }
+
         private void PrepareUpdateCheck()
         {
             try
@@ -98,32 +105,30 @@ namespace Omaha.Update
                 {
                     try
                     {
-                        string executableFilePath;
-                        if (!PathService.Get(BasePathKey.DirExe, out executableFilePath))
+                        if (!PathHelper.Get(BasePathKey.DirExe, out string executableFilePath))
                             Logger.Error("couldn not get the executeable file path");
                         Logger.Debug("searching for update for " + executableFilePath);
 
-                        IsSystemLevelInstall = !InstallUtil.IsPerUserInstall(executableFilePath);
+                        IsSystemLevelInstall = !InstallationHelper.IsPerUserInstall(executableFilePath);
                         Logger.Info("is system level install " + IsSystemLevelInstall);
 
                         ErrorCode = CanUpdateCurrentApp(executableFilePath);
                         Logger.Info("can update " + ErrorCode);
 
                         if (ErrorCode != OmahaUpdateErrorCode.OmahaUpdateNoError)
-                            ExceptionProvider.ThrowAccordingException(Marshal.GetExceptionForHR(-3), "can not update current app");
+                            ExceptionHelper.ThrowAccordingException(Marshal.GetExceptionForHR(-3), "can not update current app");
 
-                        CreateGoogleUpdate(IsSystemLevelInstall);
-
-                        if(GoogleUpdate == null)
-                            throw new System.Exception("an error occured while initialising the google update com object");
+                        InitialiseGoogleUpdate(IsSystemLevelInstall);
                     }
-                    catch (System.Exception exce)
+                    catch (Exception exce)
                     {
                         ErrorCode = OmahaUpdateErrorCode.OmahaUpdateOndemandClassNotFound;
-                        ExceptionProvider.ThrowAccordingException(exce, "could not initialise the google update com object");
+                        ExceptionHelper.ThrowAccordingException(exce, "could not initialise the google update com object");
                     }
+
                     Logger.Info("successfully created googleupdate com object");
                 }
+
                 // The class was created, so all subsequent errors are reported as:
                 ErrorCode = OmahaUpdateErrorCode.OmahaUpdateOndemandClassReportedError;
 
@@ -139,43 +144,45 @@ namespace Omaha.Update
                             if(!string.IsNullOrEmpty(Locale) && AppBundle != null)
                                 AppBundle.displayLanguage = Locale;
                         }
-                        catch { Logger.Info("could not set the language to the appbundle"); /*IGNORE*/ } 
+                        catch(Exception exce) { Logger.Info(new Exception("could not set the language to the appbundle", exce)); } 
 
                         Logger.Debug("initialising appbundle");
                         try { AppBundle?.initialize(); }
-                        catch (System.Exception exce) { ExceptionProvider.ThrowAccordingException(exce, "could not initialise the appbundle"); }
+                        catch (Exception exce) { ExceptionHelper.ThrowAccordingException(exce, "could not initialise the appbundle"); }
 
                         try
                         {
                             Logger.Debug("setting parentHWND " + (ElevationWindowHandle?.ToString() ?? string.Empty));
                             if (ElevationWindowHandle != null && AppBundle != null)
                                 AppBundle.parentHWND = ElevationWindowHandle.Value;
-                        } catch { Logger.Info("could not set the parent window handle"); /*IGNORE*/ }
+                        } catch(Exception exce) { Logger.Info(new Exception("could not set the parent window handle", exce)); }
 
                         Logger.Info("creating the installed app {" + AppGuid + "}");
                         try { AppBundle?.createInstalledApp("{" + AppGuid + "}"); }
-                        catch (System.Exception exce) { ExceptionProvider.ThrowAccordingException(exce, "could not create the installed app with the guid {" + AppGuid + "}"); }
+                        catch (Exception exce) { ExceptionHelper.ThrowAccordingException(exce, "could not create the installed app with the guid {" + AppGuid + "}"); }
                     }
-                    catch (System.Exception ex) { ExceptionProvider.ThrowAccordingException(ex, "could not create the appbundle"); }
+                    catch (Exception ex) { ExceptionHelper.ThrowAccordingException(ex, "could not create the appbundle"); }
                 }
 
                 if (App == null)
                 {
+                    // TODO: support multiple apps in one bundle
                     Logger.Debug("getting the app com object");
                     try { App = (IAppWeb)AppBundle?[0]; }
-                    catch(System.Exception exce) { ExceptionProvider.ThrowAccordingException(exce, "could not get the app from the appbundle"); }
+                    catch(Exception exce) { ExceptionHelper.ThrowAccordingException(exce, "could not get the app from the appbundle"); }
 
                     Logger.Debug("checking for update");
                     try { AppBundle?.checkForUpdate(); }
-                    catch(System.Exception exce) { ExceptionProvider.ThrowAccordingException(exce, "the appbundle could not check for updates"); }
+                    catch(Exception exce) { ExceptionHelper.ThrowAccordingException(exce, "the appbundle could not check for updates"); }
                 }
             }
-            catch (System.Exception exce) { ExceptionProvider.ThrowAccordingException(exce, "could not prepare the update check"); }
+            catch (Exception exce) { ExceptionHelper.ThrowAccordingException(exce, "could not prepare the update check"); }
         }
+
         private OmahaUpdateResult BeginUpdateCheck()
         {
             Logger = OmahaLogProvider.GetInstance(Omaha.OmahaConstants.CompanyName, OmahaConstants.AppName, Omaha.OmahaConstants.LogLevel);
-            OmahaUpdateErrorCode errorCode = OmahaUpdateErrorCode.OmahaUpdateNoError;
+            var errorCode = OmahaUpdateErrorCode.OmahaUpdateNoError;
             
             Logger.Info("the update check has been started");
             try
@@ -187,9 +194,9 @@ namespace Omaha.Update
                     HtmlErrorMessage = string.Empty;
 
                     try { PollGoogleUpdate(); }
-                    catch (System.Exception ex) { ExceptionProvider.ThrowAccordingException(ex, "could not poll the google update"); }
+                    catch (Exception ex) { ExceptionHelper.ThrowAccordingException(ex, "could not poll the google update"); }
                 }
-                catch (System.Exception exce) { ExceptionProvider.ThrowAccordingException(exce, "could not execute an update"); }
+                catch (Exception exce) { ExceptionHelper.ThrowAccordingException(exce, "could not execute an update"); }
             }
             catch (UsingExternalUpdaterException exce)
             {
@@ -202,7 +209,7 @@ namespace Omaha.Update
                 }
                 else Exception = exce;
             }
-            catch (System.Exception e) { Exception = e; }
+            catch (Exception e) { Exception = e; }
             
             if (App != null) Marshal.FinalReleaseComObject(App);
             App = null;
@@ -224,7 +231,7 @@ namespace Omaha.Update
                 HtmlErrorMessage = Resources.ResourceManager.GetString("IDS_ABOUT_BOX_EXTERNAL_UPDATE_IS_RUNNING");
             }
 
-            string htmlErrorMessage = "<a href='http://www.google.com/search?q=" + ErrorCode + "'>" + ErrorCode + "</a>";
+            var htmlErrorMessage = "<a href='http://www.google.com/search?q=" + ErrorCode + "'>" + ErrorCode + "</a>";
             if (InstallerExitCode != -1)
                 htmlErrorMessage = InstallerExitCode + " " + htmlErrorMessage;
             if (IsSystemLevelInstall)
@@ -238,7 +245,7 @@ namespace Omaha.Update
                     .Replace("%0", Exception.Message)
                     .Replace("%1", htmlErrorMessage) ?? string.Empty;
 
-            return new OmahaUpdateResult()
+            return new OmahaUpdateResult
             {
                 ErrorCode = errorCode,
                 Exception = Exception,
@@ -258,17 +265,17 @@ namespace Omaha.Update
                 {
                     isWorking = false;
                     ICurrentState state = null;
-                    CurrentState stateValue = CurrentState.StateInit;
-                    OmahaUpdateErrorCode errorCode = OmahaUpdateErrorCode.OmahaUpdateNoError;
-                    int installerExitCode = -1;
-                    string errrorString = string.Empty;
-                    OmahaUpdateUpgradeStatus upgradeStatus = OmahaUpdateUpgradeStatus.UpgradeError;
-                    string newVersion = string.Empty;
-                    int progress = 0;
+                    var stateValue = CurrentState.StateInit;
+                    var errorCode = OmahaUpdateErrorCode.OmahaUpdateNoError;
+                    var installerExitCode = -1;
+                    var errrorString = string.Empty;
+                    var upgradeStatus = OmahaUpdateUpgradeStatus.UpgradeError;
+                    var newVersion = string.Empty;
+                    var progress = 0;
 
                     GetCurrentState(ref state, ref stateValue);
                     if (IsErrorState(state, stateValue, ref errorCode, ref installerExitCode, ref errrorString))
-                        HandleUpdateError(errorCode, new System.Exception("an error state occured", Exception), installerExitCode, errrorString);
+                        HandleUpdateError(errorCode, new Exception("an error state occured", Exception), installerExitCode, errrorString);
                     else if (IsFinalState(state, stateValue, ref upgradeStatus, ref newVersion))
                     {
                         Status = upgradeStatus;
@@ -282,7 +289,7 @@ namespace Omaha.Update
                     {
                         isWorking = true;
 
-                        bool gotNewVersion = string.IsNullOrEmpty(NewVersion) && !string.IsNullOrEmpty(newVersion);
+                        var gotNewVersion = string.IsNullOrEmpty(NewVersion) && !string.IsNullOrEmpty(newVersion);
                         if (gotNewVersion) NewVersion = newVersion;
                         // Give the caller this status update if it differs from the last one given.
                         if (gotNewVersion || progress != LastReportedProgress)
@@ -295,7 +302,7 @@ namespace Omaha.Update
                         Thread.Sleep(OmahaConstants.OmahaUpdatePollIntervalMs);
                     }
                 }
-            } catch(System.Exception exce) {ExceptionProvider.ThrowAccordingException(exce, "could not poll the update"); }
+            } catch(Exception exce) {ExceptionHelper.ThrowAccordingException(exce, "could not poll the update"); }
         }
         private void GetCurrentState(ref ICurrentState currentState, ref CurrentState stateValue)
         {
@@ -305,9 +312,9 @@ namespace Omaha.Update
                 currentState = (ICurrentState)App.currentState;
                 stateValue = (CurrentState)currentState.stateValue;
             }
-            catch (System.Exception exce)
+            catch (Exception exce)
             {
-                ExceptionProvider.ThrowAccordingException(exce, "could not get the current state");
+                ExceptionHelper.ThrowAccordingException(exce, "could not get the current state");
             }
         }
         private bool IsErrorState(ICurrentState currentState, CurrentState stateValue, ref OmahaUpdateErrorCode errorCode, ref int installerExitCode, ref string errrorString)
@@ -326,7 +333,7 @@ namespace Omaha.Update
 
                 long hresultErrorCode = 0;
                 try { hresultErrorCode = currentState.errorCode; }
-                catch (System.Exception exce) { ExceptionProvider.ThrowAccordingException(exce, "could not read the error code from the current state"); }
+                catch (Exception exce) { ExceptionHelper.ThrowAccordingException(exce, "could not read the error code from the current state"); }
 
                 // Special cases:
                 // - Use a custom error code if Google Update repoted that the update was
@@ -334,24 +341,31 @@ namespace Omaha.Update
                 // - Extract the exit code of Chrome's installer if Google Update repoted
                 //   that the update failed because of a failure in the installer.
                 long code = 0;
-                if (hresultErrorCode == OmahaConstants.GoopdateEAppUpdateDisabledByPolicy)
-                    errorCode = OmahaUpdateErrorCode.OmahaUpdateDisabledByPolicy;
-                else if (hresultErrorCode == OmahaConstants.GoopdateEAppUpdateDisabledByPolicyManual)
-                    errorCode = OmahaUpdateErrorCode.OmahaUpdateDisabledByPolicyAutoOnly;
-                else if (hresultErrorCode == OmahaConstants.GoopdateinstallEInstallerFailed)
+                switch (hresultErrorCode)
                 {
-                    try { code = currentState.installerResultCode; }
-                    catch (System.Exception exce) { code = exce.HResult; }
+                    case OmahaConstants.GoopdateEAppUpdateDisabledByPolicy:
+                        errorCode = OmahaUpdateErrorCode.OmahaUpdateDisabledByPolicy;
+                        break;
+                    case OmahaConstants.GoopdateEAppUpdateDisabledByPolicyManual:
+                        errorCode = OmahaUpdateErrorCode.OmahaUpdateDisabledByPolicyAutoOnly;
+                        break;
+                    case OmahaConstants.GoopdateinstallEInstallerFailed:
+                        try { code = currentState.installerResultCode; }
+                        catch (Exception exce) { code = exce.HResult; }
+                        break;
                 }
                 installerExitCode = (int)code;
 
                 try { errrorString = currentState.completionMessage; }
-                catch { Logger.Info("could not get the completion message"); /*IGNORE*/ }
+                catch(Exception exce) { Logger.Info(new Exception("could not get the completion message", exce)); }
 
                 return true;
             }
+
             if (stateValue == CurrentState.StateUpdateAvailable && InstallUpdateIfPossible)
             {
+                // TODO: move to PollGoogleUpdate
+
                 Logger.Info("starting the installation");
                 try { AppBundle.install(); }
                 catch
@@ -388,7 +402,7 @@ namespace Omaha.Update
                     return true;
                 }
             }
-            catch (System.Exception exce) { ExceptionProvider.ThrowAccordingException(exce, "could not check if the state is a final state"); }
+            catch (Exception exce) { ExceptionHelper.ThrowAccordingException(exce, "could not check if the state is a final state"); }
             return false;
         }
         private bool IsIntermediateState(ICurrentState currentState, CurrentState stateValue, ref string newVersion, ref int progress)
@@ -417,14 +431,10 @@ namespace Omaha.Update
 
                     case CurrentState.StateDownloading:
                         ulong totalBytes = currentState.totalBytesToDownload;
-                        if (totalBytes >= 0)
-                        {
-                            // 0-50 is downloading.
-                            progress =
-                                int.Parse(
-                                    Math.Round(((double)currentState.bytesDownloaded / (double)totalBytes) * 50.0, 0)
-                                        .ToString());
-                        }
+                        // 0-50 is downloading.
+                        progress =
+                            int.Parse(
+                                Math.Round(((double)currentState.bytesDownloaded / (double)totalBytes) * 50.0, 0).ToString(CultureInfo.InvariantCulture));
                         break;
                     case CurrentState.StateDownloadComplete:
                     case CurrentState.StateExtracting:
@@ -452,7 +462,7 @@ namespace Omaha.Update
 
                 }
             }
-            catch(System.Exception exce) { ExceptionProvider.ThrowAccordingException(exce, "could not check if state is intermediate state"); }
+            catch(Exception exce) { ExceptionHelper.ThrowAccordingException(exce, "could not check if state is intermediate state"); }
             return true;
         }
 

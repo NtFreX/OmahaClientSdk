@@ -1,4 +1,4 @@
-﻿namespace Omaha.Update.Exception
+﻿namespace Omaha.Update.Exceptions
 {
     public class UsingExternalUpdaterException : System.Exception
     {

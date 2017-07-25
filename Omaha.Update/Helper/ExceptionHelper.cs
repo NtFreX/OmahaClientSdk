@@ -1,8 +1,9 @@
 ﻿using System.Runtime.InteropServices;
+using Omaha.Update.Exceptions;
 
-namespace Omaha.Update.Exception
+namespace Omaha.Update.Helper
 {
-    public static class ExceptionProvider
+    public static class ExceptionHelper
     {
         public static void ThrowAccordingException(int hresult)
         {

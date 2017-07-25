@@ -5,21 +5,23 @@ using System.Threading;
 
 using Microsoft.Win32;
 
+using Omaha.Update.Helper;
+
 namespace Omaha.Update
 {
-    public class OmahaInstallation
+    public class InstallationContext
     {
         private bool IsMachineInstallation { get; set; }
         private Guid AppId { get; set; }
         private string OmahaName { get; set; }
 
-        public OmahaInstallation(bool isMachineInstallation, string omahaName, Guid appId)
+        public InstallationContext(bool isMachineInstallation, string omahaName, Guid appId)
         {
             IsMachineInstallation = isMachineInstallation;
             AppId = appId;
             OmahaName = omahaName;
 
-            //TODO: make omaha work in user context
+            //TODO: implement the user context functionallity
             if (!IsMachineInstallation) throw new NotImplementedException();
         }
 
@@ -29,12 +31,12 @@ namespace Omaha.Update
         {
             get
             {
-                var value = Registry.GetValue(@"HKEY_LOCAL_MACHINE\Software\" + (Windows.Is64BitOperatingSystem ? "WOW6432Node\\" : "") + OmahaName + @"\Update\ClientState\{" + AppId.ToString().ToUpper() + "}", "channel", OmahaConstants.DefaultBrand);
+                var value = Registry.GetValue(@"HKEY_LOCAL_MACHINE\Software\" + (WindowsHelper.Is64BitOperatingSystem ? "WOW6432Node\\" : "") + OmahaName + @"\Update\ClientState\{" + AppId.ToString().ToUpper() + "}", "channel", OmahaConstants.DefaultBrand);
                 return value?.ToString();
             }
             set
             {
-                string baseKeyName = @"HKEY_LOCAL_MACHINE\Software\" + (Windows.Is64BitOperatingSystem ? "WOW6432Node\\" : "") + OmahaName + @"\Update\ClientState\{" + AppId.ToString().ToUpper() + "}";
+                var baseKeyName = @"HKEY_LOCAL_MACHINE\Software\" + (WindowsHelper.Is64BitOperatingSystem ? "WOW6432Node\\" : "") + OmahaName + @"\Update\ClientState\{" + AppId.ToString().ToUpper() + "}";
                 WriteRegistryValue(baseKeyName, "channel", value);
             }
         }
@@ -43,25 +45,11 @@ namespace Omaha.Update
         {
             get
             {
-                var value = Registry.GetValue(@"HKEY_LOCAL_MACHINE\Software\" + (Windows.Is64BitOperatingSystem ? "WOW6432Node\\" : "") + OmahaName + @"\Update", "uid", null);
+                var value = Registry.GetValue(@"HKEY_LOCAL_MACHINE\Software\" + (WindowsHelper.Is64BitOperatingSystem ? "WOW6432Node\\" : "") + OmahaName + @"\Update", "uid", null);
                 return value == null ? Guid.Empty : new Guid(value.ToString());
             }
         }
-
-        /// <summary>
-        /// Writes the registry value.
-        /// </summary>
-        /// <param name="baseKeyName">Name of the base key.</param>
-        /// <param name="key">The key.</param>
-        /// <param name="value">The value.</param>
-        /// <exception cref="ArgumentNullException"></exception>
-        /// <exception cref="ArgumentException"></exception>
-        /// <exception cref="UnauthorizedAccessException"></exception>
-        /// <exception cref="SecurityException"></exception>
-        /// <exception cref="InvalidOperationException"></exception>
-        /// <exception cref="Win32Exception"></exception>
-        /// <exception cref="ObjectDisposedException"></exception>
-        /// <exception cref="SystemException"></exception>
+        
         private void WriteRegistryValue(string baseKeyName, string key, string value)
         {
             if(string.IsNullOrEmpty(baseKeyName)) throw new ArgumentNullException(nameof(baseKeyName));
@@ -71,7 +59,7 @@ namespace Omaha.Update
                 Registry.SetValue(baseKeyName, key, value);
             else
             {
-                Process p = new Process()
+                var process = new Process
                 {
                     StartInfo = new ProcessStartInfo("reg.exe", "ADD " + baseKeyName + " /v " + key + " /f /d " + value)
                     {
@@ -81,8 +69,8 @@ namespace Omaha.Update
                         CreateNoWindow = true
                     },
                 };
-                p.Start();
-                p.WaitForExit();
+                process.Start();
+                process.WaitForExit();
             }
         }
     }
